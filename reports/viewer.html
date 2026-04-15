@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정보 수집 보고서 뷰어 — 2026-04-15</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: #0f0f1a;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #1a1a2e;
+      border-bottom: 1px solid #2d2d50;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    header .icon { font-size: 1.3rem; }
+    header h1 { font-size: 1rem; font-weight: 700; color: #e8e8f0; letter-spacing: -0.01em; }
+    header .badge {
+      margin-left: auto;
+      background: #0066cc;
+      color: white;
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left: Viewer ── */
+    #viewer {
+      flex: 1;
+      overflow-y: auto;
+      background: #ffffff;
+      padding: 40px 52px;
+    }
+
+    /* ── Right: Sidebar ── */
+    #sidebar {
+      width: 230px;
+      background: #1a1a2e;
+      border-left: 1px solid #2d2d50;
+      overflow-y: auto;
+      padding: 20px 14px;
+      flex-shrink: 0;
+    }
+    #sidebar .sidebar-title {
+      color: #6b6b9a;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      padding: 0 10px;
+      margin-bottom: 14px;
+    }
+    .run-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      padding: 11px 12px;
+      background: transparent;
+      border: none;
+      color: #9999bb;
+      cursor: pointer;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      margin-bottom: 4px;
+      transition: background 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+    .run-btn:hover { background: #2a2a48; color: #ddddf0; }
+    .run-btn.active { background: #0055bb; color: #ffffff; font-weight: 600; }
+    .run-btn .run-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .run-btn.active .run-num { background: rgba(255,255,255,0.25); }
+
+    /* ── Markdown styles ── */
+    #md-body h1 {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #111130;
+      border-bottom: 2px solid #e8e8f5;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      line-height: 1.3;
+    }
+    #md-body h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1a1a40;
+      margin: 32px 0 12px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #ececf5;
+    }
+    #md-body h3 {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #2a2a60;
+      margin: 22px 0 8px;
+    }
+    #md-body p {
+      line-height: 1.75;
+      color: #333350;
+      margin-bottom: 10px;
+    }
+    #md-body blockquote {
+      border-left: 3px solid #c0c0e0;
+      padding: 6px 14px;
+      color: #6666aa;
+      font-size: 0.88rem;
+      margin: 6px 0 10px;
+      background: #f8f8ff;
+      border-radius: 0 4px 4px 0;
+    }
+    /* 테이블 공통 */
+    #md-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px;
+      font-size: 0.875rem;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,80,0.07);
+    }
+    #md-body th {
+      background: #1a1a2e;
+      color: #dde0ff;
+      padding: 9px 13px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+    #md-body td {
+      padding: 8px 13px;
+      border-bottom: 1px solid #eeeefc;
+      color: #333360;
+      vertical-align: top;
+    }
+    #md-body tr:last-child td { border-bottom: none; }
+    #md-body tr:nth-child(even) td { background: #f9f9ff; }
+    /* 요약 열 강조 */
+    #md-body td.col-summary {
+      color: #0044aa;
+      font-size: 0.84rem;
+      font-weight: 500;
+      background: #f0f4ff !important;
+    }
+    #md-body tr:nth-child(even) td.col-summary { background: #e8eeff !important; }
+    #md-body a {
+      color: #0055cc;
+      text-decoration: none;
+      border-bottom: 1px dotted #0055cc44;
+    }
+    #md-body a:hover { color: #003fa0; border-bottom-style: solid; }
+    #md-body hr {
+      border: none;
+      border-top: 1px solid #e8e8f5;
+      margin: 28px 0;
+    }
+    #md-body ol, #md-body ul { padding-left: 24px; margin-bottom: 12px; }
+    #md-body li { line-height: 1.75; color: #333360; margin-bottom: 4px; }
+    #md-body strong { color: #111130; }
+    #md-body code {
+      background: #f0f0fa;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.88em;
+      color: #330066;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* scrollbar */
+    #viewer::-webkit-scrollbar { width: 6px; }
+    #viewer::-webkit-scrollbar-track { background: transparent; }
+    #viewer::-webkit-scrollbar-thumb { background: #cccce0; border-radius: 3px; }
+    #sidebar::-webkit-scrollbar { width: 4px; }
+    #sidebar::-webkit-scrollbar-thumb { background: #3a3a60; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<script id="md-raw" type="text/plain">
+# 정보 수집 보고서 — 2026-04-15
+
+---
+
+## 기술 정보
+
+### Velog 트렌드 (상위 5개)
+> 취득 시각: 2026-04-15
+> ※ Velog는 JavaScript 렌더링 페이지로 직접 크롤링이 제한되어 검색 결과 기반으로 수집
+
+| # | 제목 | URL |
+|---|------|-----|
+| 1 | 하네스 엔지니어링 (Harness Engineering) | https://velog.io/@wclee7/%ED%95%98%EB%84%A4%EC%8A%A4-%EC%97%94%EC%A7%80%EB%8B%88%EC%96%B4%EB%A7%81-Harness-Engineering |
+| 2 | 2026년 최신판! 무료로 쓸 수 있는 Postman 대체 툴 10선 | https://velog.io/@ken708/postman-alternatives-2026 |
+| 3 | Tistory에서 Velog로 환승한 이유 | https://velog.io/@haero_kim/Tistory-%EC%97%90%EC%84%9C-Velog-%EB%A1%9C-%ED%99%98%EC%8A%B9%ED%95%9C-%EC%9D%B4%EC%9C%A0 |
+| 4 | Velog로 돌아온 이유 (feat. NotionToMedium) | https://velog.io/@guswlsdl0121/Velog%EB%A1%9C-%EB%8F%8C%EC%95%84%EC%98%A8-%EC%9D%B4%EC%9C%A0-feat.-NotionToMedium |
+| 5 | [2025 회고] 많은 일이 있던 년도 | https://velog.io/@jgh/2025-%ED%9A%8C%EA%B3%A0-%EB%A7%8E%EC%9D%80-%EC%9D%BC%EC%9D%B4-%EC%9E%88%EB%8D%98-%EB%85%84%EB%8F%84 |
+
+---
+
+### 요즘IT 인기 기사 (상위 5개)
+> 취득 시각: 2026-04-15
+
+| # | 제목 | 요약 | URL |
+|---|------|------|-----|
+| 1 | Claude Code를 만든 Boris Cherny가 직접 추천한 기능 15가지 | Claude Code 핵심 기능 15가지를 개발자가 직접 설명 | https://yozm.wishket.com/magazine/detail/3690/ |
+| 2 | 왜 우리는 아직도 AI에게 일을 제대로 못 시킬까? | AI 지시 실패 원인 분석 및 효과적인 프롬프트 전략 | https://yozm.wishket.com/magazine/detail/3687/ |
+| 3 | 효율적인 디자인을 위한 크롬 확장 프로그램 7가지 | 디자이너 워크플로우를 자동화하는 크롬 확장 7선 | https://yozm.wishket.com/magazine/detail/3689/ |
+| 4 | 멀티 AI 터미널 도구 3대장, 뭐가 다를까? 클로드코드 vs 코덱스CLI vs 제미나이CLI | 클로드코드·코덱스CLI·제미나이CLI 기능·UX 심층 비교 | https://yozm.wishket.com/magazine/detail/3669/ |
+| 5 | AI로 프로젝트 10개 만든 개발자가 서류에서 떨어지는 이유 | AI 프로젝트 남발의 역효과와 진짜 실력 증명 방법 | https://yozm.wishket.com/magazine/detail/3694/ |
+
+---
+
+### GitHub Trending (2026-04-15)
+> 취득 시각: 2026-04-15
+
+| # | 저장소 | URL | 언어 | 스타 | 설명 | 요약 |
+|---|--------|-----|------|------|------|------|
+| 1 | forrestchang/andrej-karpathy-skills | https://github.com/forrestchang/andrej-karpathy-skills | — | ⭐33,371 | Claude 코드 동작 개선을 위한 CLAUDE.md 파일 | Claude Code 동작 튜닝을 위한 CLAUDE.md 템플릿 모음 |
+| 2 | thedotmack/claude-mem | https://github.com/thedotmack/claude-mem | TypeScript | ⭐55,674 | 코딩 세션 내용을 자동으로 캡처하고 AI로 압축하여 향후 세션에 주입 | 코딩 세션 대화를 AI로 압축, 다음 세션 시작 시 자동 컨텍스트 주입 |
+| 3 | jamiepine/voicebox | https://github.com/jamiepine/voicebox | TypeScript | ⭐17,290 | 오픈소스 음성 합성 스튜디오 | TTS 파이프라인 전체를 웹 UI로 제어하는 오픈소스 도구 |
+| 4 | pascalorg/editor | https://github.com/pascalorg/editor | TypeScript | ⭐11,580 | 3D 건축 프로젝트 생성 및 공유 플랫폼 | 3D 건축 디자인을 브라우저에서 생성·공유하는 협업 도구 |
+| 5 | microsoft/markitdown | https://github.com/microsoft/markitdown | Python | ⭐108,388 | 파일과 오피스 문서를 마크다운으로 변환하는 Python 도구 | Office·PDF·HTML 문서를 LLM 입력용 마크다운으로 일괄 변환 |
+| 6 | obra/superpowers | https://github.com/obra/superpowers | Shell | ⭐152,208 | 에이전트 기술 프레임워크 및 소프트웨어 개발 방법론 | AI 에이전트가 재사용할 수 있는 스킬 라이브러리 프레임워크 |
+| 7 | chrislgarry/Apollo-11 | https://github.com/chrislgarry/Apollo-11 | Assembly | ⭐66,337 | 아폴로 11호 유도 컴퓨터 원본 소스 코드 | 1969년 달 착륙에 사용된 AGC 어셈블리 코드 아카이브 |
+| 8 | virattt/ai-hedge-fund | https://github.com/virattt/ai-hedge-fund | Python | ⭐54,098 | AI 헤지펀드 팀 | GPT·Claude 등 멀티 LLM 기반 포트폴리오 운용 시뮬레이터 |
+| 9 | shiyu-coder/Kronos | https://github.com/shiyu-coder/Kronos | Python | ⭐17,772 | 금융 시장 언어 기초 모델 | 주가·채권 시계열을 사전학습한 금융 특화 언어 모델 |
+| 10 | NousResearch/hermes-agent | https://github.com/NousResearch/hermes-agent | Python | ⭐84,110 | 사용자와 함께 성장하는 에이전트 | 대화할수록 사용자에게 개인화되는 자기진화형 AI 에이전트 |
+
+---
+
+## 경제 정보
+
+### 코스피 / 코스닥 지수
+> 취득 시각: 2026-04-15 (출처: investing.com)
+
+| 지수 | 현재값 | 전일 대비 |
+|------|--------|-----------|
+| 코스피 (KOSPI) | 5,967.75 | +159.13 (+2.74%) |
+| 코스닥 (KOSDAQ) | 1,121.88 | +22.04 (+2.00%) |
+
+### USD/KRW 환율
+> 취득 시각: 2026-04-15
+
+| 통화쌍 | 현재값 | 당일 범위 |
+|--------|--------|-----------|
+| USD/KRW | 1,484.91원 | 1,470.63 ~ 1,488.40 |
+
+### 주요 마켓 뉴스 (3건)
+> 취득 시각: 2026-04-15
+
+1. **코스피, 미·이란 휴전 합의로 8.96% 급등** — 4/10 코스피가 5,858에 마감, 외국인 5.3조원 순매수하며 8주 만에 매수 우위 전환. ([머니투데이](https://www.mt.co.kr/stock/2026/04/12/2026041213043147343))
+2. **JD 밴스 부통령, 이란 협상 합의 없이 귀국** — 미·이란 협상 불발로 중동 불확실성 재부각, 증시 상승 탄력 약화 우려.
+3. **ASML·TSMC 1분기 실적 발표 예정** — 15~16일 반도체 대형주 실적 공개, 반도체 장비·파운드리 업종 주목. ([Investing.com - 코스피](https://kr.investing.com/indices/kospi))
+
+---
+
+# 정보 수집 보고서 — 2026-04-15 (2회차)
+
+---
+
+## 기술 정보
+
+### Velog 트렌드 (상위 5개)
+> 취득 시각: 2026-04-15
+> ※ Velog는 JavaScript 렌더링 페이지로 직접 크롤링이 제한되어 검색 결과 기반으로 수집
+
+| # | 제목 | URL |
+|---|------|-----|
+| 1 | 하네스 엔지니어링 (Harness Engineering) | https://velog.io/@wclee7/%ED%95%98%EB%84%A4%EC%8A%A4-%EC%97%94%EC%A7%80%EB%8B%88%EC%96%B4%EB%A7%81-Harness-Engineering |
+| 2 | 2026년 최신판! 무료로 쓸 수 있는 Postman 대체 툴 10선 | https://velog.io/@ken708/postman-alternatives-2026 |
+| 3 | Tistory에서 Velog로 환승한 이유 | https://velog.io/@haero_kim/Tistory-%EC%97%90%EC%84%9C-Velog-%EB%A1%9C-%ED%99%98%EC%8A%B9%ED%95%9C-%EC%9D%B4%EC%9C%A0 |
+| 4 | velog 개발블로그 만들기 과정 삽질기록 | https://velog.io/@boseung/velog%EA%B0%9C%EB%B0%9C%EB%B8%94%EB%A1%9C%EA%B7%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0-%EA%B3%BC%EC%A0%95-%EC%82%BD%EC%A7%88%EA%B8%B0%EB%A1%9D |
+| 5 | Velog에 작성했던 글로 기술 블로그 만들기 | https://velog.io/@leehyunho2001/ayaan-tech |
+
+---
+
+### 요즘IT 인기 기사 (상위 5개)
+> 취득 시각: 2026-04-15
+
+| # | 제목 | 요약 | URL |
+|---|------|------|-----|
+| 1 | Claude Code를 만든 Boris Cherny가 직접 추천한 기능 15가지 | Claude Code 핵심 기능 15가지를 개발자가 직접 설명 | https://yozm.wishket.com/magazine/detail/3690/ |
+| 2 | 왜 우리는 아직도 AI에게 일을 제대로 못 시킬까? | AI 지시 실패 원인 분석 및 효과적인 프롬프트 전략 | https://yozm.wishket.com/magazine/detail/3687/ |
+| 3 | 효율적인 디자인을 위한 크롬 확장 프로그램 7가지 | 디자이너 워크플로우를 자동화하는 크롬 확장 7선 | https://yozm.wishket.com/magazine/detail/3689/ |
+| 4 | 멀티 AI 터미널 도구 3대장, 뭐가 다를까? 클로드코드 vs 코덱스CLI vs 제미나이CLI | 클로드코드·코덱스CLI·제미나이CLI 기능·UX 심층 비교 | https://yozm.wishket.com/magazine/detail/3669/ |
+| 5 | AI로 프로젝트 10개 만든 개발자가 서류에서 떨어지는 이유 | AI 프로젝트 남발의 역효과와 진짜 실력 증명 방법 | https://yozm.wishket.com/magazine/detail/3694/ |
+
+---
+
+### GitHub Trending (2026-04-15)
+> 취득 시각: 2026-04-15
+
+| # | 저장소 | URL | 언어 | 스타 | 설명 | 요약 |
+|---|--------|-----|------|------|------|------|
+| 1 | forrestchang/andrej-karpathy-skills | https://github.com/forrestchang/andrej-karpathy-skills | — | ⭐33,638 | Claude 코드 동작 개선을 위한 CLAUDE.md 파일 | Claude Code 동작 튜닝을 위한 CLAUDE.md 템플릿 모음 |
+| 2 | thedotmack/claude-mem | https://github.com/thedotmack/claude-mem | TypeScript | ⭐55,751 | 코딩 세션 내용을 자동으로 캡처하고 AI로 압축하여 향후 세션에 주입 | 코딩 세션 대화를 AI로 압축, 다음 세션 시작 시 자동 컨텍스트 주입 |
+| 3 | jamiepine/voicebox | https://github.com/jamiepine/voicebox | TypeScript | ⭐17,321 | 오픈소스 음성 합성 스튜디오 | TTS 파이프라인 전체를 웹 UI로 제어하는 오픈소스 도구 |
+| 4 | pascalorg/editor | https://github.com/pascalorg/editor | TypeScript | ⭐11,620 | 3D 건축 프로젝트 생성 및 공유 플랫폼 | 3D 건축 디자인을 브라우저에서 생성·공유하는 협업 도구 |
+| 5 | microsoft/markitdown | https://github.com/microsoft/markitdown | Python | ⭐108,438 | 파일과 오피스 문서를 마크다운으로 변환하는 Python 도구 | Office·PDF·HTML 문서를 LLM 입력용 마크다운으로 일괄 변환 |
+| 6 | obra/superpowers | https://github.com/obra/superpowers | Shell | ⭐152,247 | 에이전트 기술 프레임워크 및 소프트웨어 개발 방법론 | AI 에이전트가 재사용할 수 있는 스킬 라이브러리 프레임워크 |
+| 7 | chrislgarry/Apollo-11 | https://github.com/chrislgarry/Apollo-11 | Assembly | ⭐66,355 | 아폴로 11호 유도 컴퓨터 원본 소스 코드 | 1969년 달 착륙에 사용된 AGC 어셈블리 코드 아카이브 |
+| 8 | virattt/ai-hedge-fund | https://github.com/virattt/ai-hedge-fund | Python | ⭐54,119 | AI 헤지펀드 팀 | GPT·Claude 등 멀티 LLM 기반 포트폴리오 운용 시뮬레이터 |
+| 9 | shiyu-coder/Kronos | https://github.com/shiyu-coder/Kronos | Python | ⭐17,786 | 금융 시장 언어 기초 모델 | 주가·채권 시계열을 사전학습한 금융 특화 언어 모델 |
+| 10 | NousResearch/hermes-agent | https://github.com/NousResearch/hermes-agent | Python | ⭐84,219 | 사용자와 함께 성장하는 에이전트 | 대화할수록 사용자에게 개인화되는 자기진화형 AI 에이전트 |
+
+---
+
+## 경제 정보
+
+### 코스피 / 코스닥 지수
+> 취득 시각: 2026-04-15 09:29:50 (출처: investing.com, 장중 실시간)
+
+| 지수 | 현재값 | 전일 대비 |
+|------|--------|-----------|
+| 코스피 (KOSPI) | 6,172.38 | +204.63 (+3.43%) |
+| 코스닥 (KOSDAQ) | 1,137.75 | +15.87 (+1.41%) |
+
+### USD/KRW 환율
+> 취득 시각: 2026-04-15
+
+| 통화쌍 | 현재값 | 당일 범위 |
+|--------|--------|-----------|
+| USD/KRW | 1,472.95원 | 1,470.41 ~ 1,474.11 |
+
+### 주요 마켓 뉴스 (3건)
+> 취득 시각: 2026-04-15
+
+1. **코스피 장중 6,000선 돌파, 외국인 순매수 지속** — ASML(15일)·TSMC(16일) 1분기 실적 발표 앞두고 반도체 섹터 중심으로 강세. 연말 7,500p 전망도 등장. ([Investing.com](https://kr.investing.com/news/stock-market-news/article-1898640))
+2. **엔씨소프트 상호 'NC'로 변경·CJ CGV 보통주 추가상장** — 4월 15일 주요 기업 공시 일정. ([서울신문](https://www.seoul.co.kr/news/economy/securities/2026/04/14/20260414500236))
+3. **미·이란 협상 불확실성 속 외국인 복귀 흐름 지속** — JD 밴스 부통령 협상 결렬 귀국에도 외국인 순매수 유지, 8주 만에 주간 매수 우위 전환. ([머니투데이](https://www.mt.co.kr/stock/2026/04/12/2026041213043147343))
+
+---
+
+# 정보 수집 보고서 — 2026-04-15 (3회차)
+
+---
+
+## 기술 정보
+
+### Velog 트렌드 (상위 5개)
+> 취득 시각: 2026-04-15
+> ※ Velog는 JavaScript 렌더링 페이지로 직접 크롤링이 제한되어 검색 결과 기반으로 수집
+
+| # | 제목 | URL |
+|---|------|-----|
+| 1 | 하네스 엔지니어링 (Harness Engineering) | https://velog.io/@wclee7/%ED%95%98%EB%84%A4%EC%8A%A4-%EC%97%94%EC%A7%80%EB%8B%88%EC%96%B4%EB%A7%81-Harness-Engineering |
+| 2 | 2026년 최신판! 무료로 쓸 수 있는 Postman 대체 툴 10선 | https://velog.io/@ken708/postman-alternatives-2026 |
+| 3 | Tistory에서 Velog로 환승한 이유 | https://velog.io/@haero_kim/Tistory-%EC%97%90%EC%84%9C-Velog-%EB%A1%9C-%ED%99%98%EC%8A%B9%ED%95%9C-%EC%9D%B4%EC%9C%A0 |
+| 4 | velog 개발블로그 만들기 과정 삽질기록 | https://velog.io/@boseung/velog%EA%B0%9C%EB%B0%9C%EB%B8%94%EB%A1%9C%EA%B7%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0-%EA%B3%BC%EC%A0%95-%EC%82%BD%EC%A7%88%EA%B8%B0%EB%A1%9D |
+| 5 | Velog에 작성했던 글로 기술 블로그 만들기 | https://velog.io/@leehyunho2001/ayaan-tech |
+
+---
+
+### 요즘IT 인기 기사 (상위 5개)
+> 취득 시각: 2026-04-15
+
+| # | 제목 | 요약 | URL |
+|---|------|------|-----|
+| 1 | Claude Code를 만든 Boris Cherny가 직접 추천한 기능 15가지 | Claude Code 핵심 기능 15가지를 개발자가 직접 설명 | https://yozm.wishket.com/magazine/detail/3690/ |
+| 2 | 왜 우리는 아직도 AI에게 일을 제대로 못 시킬까? | AI 지시 실패 원인 분석 및 효과적인 프롬프트 전략 | https://yozm.wishket.com/magazine/detail/3687/ |
+| 3 | 효율적인 디자인을 위한 크롬 확장 프로그램 7가지 | 디자이너 워크플로우를 자동화하는 크롬 확장 7선 | https://yozm.wishket.com/magazine/detail/3689/ |
+| 4 | 멀티 AI 터미널 도구 3대장, 뭐가 다를까? 클로드코드 vs 코덱스CLI vs 제미나이CLI | 클로드코드·코덱스CLI·제미나이CLI 기능·UX 심층 비교 | https://yozm.wishket.com/magazine/detail/3669/ |
+| 5 | AI로 프로젝트 10개 만든 개발자가 서류에서 떨어지는 이유 | AI 프로젝트 남발의 역효과와 진짜 실력 증명 방법 | https://yozm.wishket.com/magazine/detail/3694/ |
+
+---
+
+### GitHub Trending (2026-04-15)
+> 취득 시각: 2026-04-15
+
+| # | 저장소 | URL | 언어 | 스타 | 설명 | 요약 |
+|---|--------|-----|------|------|------|------|
+| 1 | forrestchang/andrej-karpathy-skills | https://github.com/forrestchang/andrej-karpathy-skills | — | ⭐34,570 | Claude 코드 동작 개선을 위한 CLAUDE.md 파일 | Claude Code 동작 튜닝을 위한 CLAUDE.md 템플릿 모음 |
+| 2 | thedotmack/claude-mem | https://github.com/thedotmack/claude-mem | TypeScript | ⭐55,976 | 코딩 세션 내용을 자동으로 캡처하고 AI로 압축하여 향후 세션에 주입 | 코딩 세션 대화를 AI로 압축, 다음 세션 시작 시 자동 컨텍스트 주입 |
+| 3 | jamiepine/voicebox | https://github.com/jamiepine/voicebox | TypeScript | ⭐17,437 | 오픈소스 음성 합성 스튜디오 | TTS 파이프라인 전체를 웹 UI로 제어하는 오픈소스 도구 |
+| 4 | pascalorg/editor | https://github.com/pascalorg/editor | TypeScript | ⭐11,728 | 3D 건축 프로젝트 생성 및 공유 플랫폼 | 3D 건축 디자인을 브라우저에서 생성·공유하는 협업 도구 |
+| 5 | microsoft/markitdown | https://github.com/microsoft/markitdown | Python | ⭐108,556 | 파일과 오피스 문서를 마크다운으로 변환하는 Python 도구 | Office·PDF·HTML 문서를 LLM 입력용 마크다운으로 일괄 변환 |
+| 6 | obra/superpowers | https://github.com/obra/superpowers | Shell | ⭐152,473 | 에이전트 기술 프레임워크 및 소프트웨어 개발 방법론 | AI 에이전트가 재사용할 수 있는 스킬 라이브러리 프레임워크 |
+| 7 | chrislgarry/Apollo-11 | https://github.com/chrislgarry/Apollo-11 | Assembly | ⭐66,401 | 아폴로 11호 유도 컴퓨터 원본 소스 코드 | 1969년 달 착륙에 사용된 AGC 어셈블리 코드 아카이브 |
+| 8 | virattt/ai-hedge-fund | https://github.com/virattt/ai-hedge-fund | Python | ⭐54,231 | AI 헤지펀드 팀 | GPT·Claude 등 멀티 LLM 기반 포트폴리오 운용 시뮬레이터 |
+| 9 | shiyu-coder/Kronos | https://github.com/shiyu-coder/Kronos | Python | ⭐17,844 | 금융 시장 언어 기초 모델 | 주가·채권 시계열을 사전학습한 금융 특화 언어 모델 |
+| 10 | NousResearch/hermes-agent | https://github.com/NousResearch/hermes-agent | Python | ⭐84,981 | 사용자와 함께 성장하는 에이전트 | 대화할수록 사용자에게 개인화되는 자기진화형 AI 에이전트 |
+
+---
+
+## 경제 정보
+
+### 코스피 / 코스닥 지수
+> 취득 시각: 2026-04-15 11:37:40 (출처: investing.com, 장중 실시간)
+
+| 지수 | 현재값 | 전일 대비 |
+|------|--------|-----------|
+| 코스피 (KOSPI) | 6,146.20 | +178.45 (+2.99%) |
+| 코스닥 (KOSDAQ) | 1,147.90 | +26.02 (+2.32%) |
+
+### USD/KRW 환율
+> 취득 시각: 2026-04-15
+
+| 통화쌍 | 현재값 | 당일 범위 |
+|--------|--------|-----------|
+| USD/KRW | 1,473.94원 | 1,470.36 ~ 1,474.79 |
+
+### 주요 마켓 뉴스 (3건)
+> 취득 시각: 2026-04-15
+
+1. **코스피 장중 6,000선 돌파, 미·이란 2차 협상 기대감 유지** — 상승 추세 지속, 변동성 장세 속 외국인 순매수 흐름 이어져. ([Investing.com](https://kr.investing.com/indices/kospi))
+2. **외국인 8주 만에 순매수 전환, 종전 협상 불확실성 변수** — 협상 불발 시 변동성 재확대 가능성, 증권가 실적 모멘텀은 유효 판단. ([머니투데이](https://www.mt.co.kr/stock/2026/04/12/2026041213043147343))
+3. **ASML 오늘 오후·TSMC 내일 1분기 실적 공개** — 반도체 장비·파운드리 업종 주목, 지수 방향성 결정 변수. ([Investing.com Economic Calendar](https://www.investing.com/economic-calendar))
+</script>
+
+<header>
+  <span class="icon">📊</span>
+  <h1>정보 수집 보고서 뷰어</h1>
+  <span class="badge" id="run-count"></span>
+</header>
+
+<div class="layout">
+  <!-- 왼쪽: Markdown 뷰어 -->
+  <main id="viewer">
+    <div id="md-body"></div>
+  </main>
+
+  <!-- 오른쪽: 실행 횟수 리스트 -->
+  <aside id="sidebar">
+    <div class="sidebar-title">실행 목록</div>
+    <div id="run-list"></div>
+  </aside>
+</div>
+
+<script>
+  marked.setOptions({ breaks: true, gfm: true });
+
+  const raw = document.getElementById('md-raw').textContent.trim();
+
+  // H1 "# 정보 수집 보고서" 앞에서 분할
+  const parts = raw
+    .split(/(?=^# 정보 수집 보고서)/m)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  function getLabel(text, idx) {
+    const m = text.match(/\((\d+회차)\)/);
+    return m ? m[1] : `${idx + 1}회차`;
+  }
+
+  document.getElementById('run-count').textContent = `총 ${parts.length}회 수집`;
+
+  const mdBody = document.getElementById('md-body');
+
+  function renderSection(text) {
+    mdBody.innerHTML = marked.parse(text);
+
+    // 테이블의 "요약" 헤더가 있는 열 인덱스를 찾아 td에 클래스 부여
+    mdBody.querySelectorAll('table').forEach(table => {
+      const headers = Array.from(table.querySelectorAll('thead th, tr:first-child th'));
+      const summaryIdx = headers.findIndex(th => th.textContent.trim() === '요약');
+      if (summaryIdx < 0) return;
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells[summaryIdx]) cells[summaryIdx].classList.add('col-summary');
+      });
+    });
+
+    // URL만 있는 td → 클릭 가능한 링크로 변환
+    mdBody.querySelectorAll('td').forEach(td => {
+      const t = td.textContent.trim();
+      if (!td.querySelector('a') && /^https?:\/\//.test(t)) {
+        td.innerHTML = `<a href="${t}" target="_blank" rel="noopener">${t}</a>`;
+      }
+    });
+
+    // 모든 링크 새 탭으로
+    mdBody.querySelectorAll('a[href]').forEach(a => {
+      if (!a.href.startsWith('#')) { a.target = '_blank'; a.rel = 'noopener'; }
+    });
+
+    document.getElementById('viewer').scrollTop = 0;
+  }
+
+  const runList = document.getElementById('run-list');
+  parts.forEach((section, i) => {
+    const label = getLabel(section, i);
+    const btn = document.createElement('button');
+    btn.className = 'run-btn' + (i === 0 ? ' active' : '');
+    btn.innerHTML = `<span class="run-num">${i + 1}</span>${label}`;
+    btn.addEventListener('click', () => {
+      runList.querySelectorAll('.run-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSection(section);
+    });
+    runList.appendChild(btn);
+  });
+
+  if (parts.length > 0) renderSection(parts[0]);
+</script>
+</body>
+</html>
